@@ -8,13 +8,14 @@ from sqlalchemy.sql import func
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import InvalidTokenError
 import httpx
 import os
 
 # 설정
 class Settings:
-    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost:5432/oters")
+    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:password@localhost:5432/oters")
     SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
     ALGORITHM = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES = 30
@@ -162,7 +163,7 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
-    except JWTError:
+    except InvalidTokenError:
         return None
 
 # 로컬 Ollama API 호출 함수
