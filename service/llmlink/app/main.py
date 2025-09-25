@@ -22,9 +22,11 @@ class Settings:
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
     ALLOWED_ORIGINS = ["http://localhost:3000", "https://your-frontend-domain.vercel.app"]
-    LLM_SERVICE_URL = os.getenv("LLM_SERVICE_URL", "http://localhost:8001")
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
     DEBUG = os.getenv("DEBUG", "true").lower() == "true"
+    
+    # 로컬 Ollama API 설정
+    LOCAL_OLLAMA_URL = os.getenv("LOCAL_OLLAMA_URL", "http://localhost:8003")
 
 settings = Settings()
 
@@ -163,11 +165,44 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
     except JWTError:
         return None
 
-def get_user_id_from_token(token: str) -> Optional[int]:
-    payload = verify_token(token)
-    if payload and payload.get("type") == "access":
-        return payload.get("user_id")
-    return None
+# 로컬 Ollama API 호출 함수
+async def call_local_ollama_api(message: str, context: str = "") -> str:
+    """로컬 Ollama API를 호출하여 응답 생성"""
+    try:
+        print(f"🤖 AI API 호출: {settings.LOCAL_OLLAMA_URL}")
+        print(f"📝 사용자 메시지: {message[:50]}...")
+        print(f"📚 컨텍스트: {context[:100] if context else '없음'}...")
+        
+        # 로컬 Ollama API 호출
+        url = f"{settings.LOCAL_OLLAMA_URL}/api/chat"
+        data = {
+            "message": message,
+            "context": context,
+            "model": "llama2"
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=data, timeout=60.0)
+            print(f"📡 AI API 응답 상태: {response.status_code}")
+            
+            if response.status_code == 200:
+                result = response.json()
+                ai_response = result.get("response", "죄송합니다. 응답을 생성할 수 없습니다.")
+                print(f"✅ AI 응답: {ai_response[:100]}...")
+                return ai_response
+            else:
+                print(f"❌ 로컬 Ollama API 오류: {response.status_code} - {response.text}")
+                return "죄송합니다. 현재 AI 서비스에 문제가 있습니다."
+                
+    except httpx.ConnectError:
+        print(f"❌ AI API 연결 실패: {settings.LOCAL_OLLAMA_URL}에 연결할 수 없습니다.")
+        return "죄송합니다. AI 서비스에 연결할 수 없습니다. AI API 서비스가 실행 중인지 확인해주세요."
+    except httpx.TimeoutException:
+        print("⏰ AI API 응답 시간 초과")
+        return "죄송합니다. AI 응답 시간이 초과되었습니다."
+    except Exception as e:
+        print(f"❌ 로컬 Ollama API 호출 실패: {e}")
+        return "죄송합니다. 현재 AI 서비스에 문제가 있습니다."
 
 # FastAPI 앱 생성
 app = FastAPI(
@@ -429,27 +464,17 @@ async def chat_with_ai(
         # 컨텍스트 데이터를 문자열로 변환
         context_text = ""
         if context_data:
+            print(f"📚 사용자 컨텍스트 데이터 {len(context_data)}개 발견")
             context_text = "\n".join([
                 f"[{data.data_type}] {data.title or ''}: {data.content[:200]}..."
                 for data in context_data
             ])
+            print(f"📝 컨텍스트 요약: {context_text[:200]}...")
+        else:
+            print("📚 사용자 컨텍스트 데이터 없음")
         
-        # LLM 서비스에 요청 (컨텍스트 포함)
-        async with httpx.AsyncClient() as client:
-            llm_response = await client.post(
-                f"{settings.LLM_SERVICE_URL}/api/chat",
-                json={
-                    "message": chat_message.message, 
-                    "user_id": user_id,
-                    "context": context_text
-                },
-                timeout=30.0
-            )
-            
-            if llm_response.status_code == 200:
-                ai_message = llm_response.json().get("message", "죄송합니다. 응답을 생성할 수 없습니다.")
-            else:
-                ai_message = "죄송합니다. 현재 AI 서비스에 문제가 있습니다."
+        # 로컬 Ollama API 호출 (컨텍스트 포함)
+        ai_message = await call_local_ollama_api(chat_message.message, context_text)
                 
     except Exception as e:
         ai_message = f"AI 서비스 연결 오류: {str(e)}"

@@ -177,7 +177,6 @@ const Message = styled.div`
 const ChatPage = () => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
-  const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const messagesEndRef = useRef(null);
@@ -278,12 +277,6 @@ const ChatPage = () => {
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={handleKeyPress}
             />
-            <VoiceButton 
-              onClick={toggleRecording}
-              className={isRecording ? 'recording' : ''}
-            >
-              {isRecording ? <MicOff size={20} /> : <Mic size={20} />}
-            </VoiceButton>
             <SendButton 
               onClick={sendMessage}
               disabled={!message.trim() || isLoading}
