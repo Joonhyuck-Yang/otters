@@ -45,6 +45,7 @@ class User(Base):
     
     diary_entries = relationship("DiaryEntry", back_populates="user")
     chat_logs = relationship("ChatLog", back_populates="user")
+    context_data = relationship("UserContextData", back_populates="user")
 
 class DiaryEntry(Base):
     __tablename__ = "diary_entries"
@@ -68,6 +69,21 @@ class ChatLog(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     user = relationship("User", back_populates="chat_logs")
+
+class UserContextData(Base):
+    __tablename__ = "user_context_data"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    data_type = Column(String(50), nullable=False)  # 'diary', 'note', 'memory'
+    title = Column(String(200), nullable=True)
+    content = Column(Text, nullable=False)
+    tags = Column(String(500), nullable=True)  # 쉼표로 구분된 태그들
+    importance_score = Column(Integer, default=1)  # 1-5 중요도
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    user = relationship("User", back_populates="context_data")
 
 # Pydantic 스키마
 class GoogleAuthRequest(BaseModel):
@@ -95,6 +111,23 @@ class ChatMessage(BaseModel):
 class ChatResponse(BaseModel):
     message: str
     session_id: str
+
+class ContextDataCreate(BaseModel):
+    data_type: str
+    title: Optional[str] = None
+    content: str
+    tags: Optional[str] = None
+    importance_score: Optional[int] = 1
+
+class ContextDataResponse(BaseModel):
+    id: int
+    data_type: str
+    title: Optional[str]
+    content: str
+    tags: Optional[str]
+    importance_score: int
+    created_at: datetime
+    updated_at: datetime
 
 # 의존성
 def get_db():
@@ -304,6 +337,19 @@ async def create_diary(
     db.commit()
     db.refresh(diary_entry)
     
+    # 일기를 컨텍스트 데이터에도 저장 (AI가 참조할 수 있도록)
+    context_data = UserContextData(
+        user_id=user_id,
+        data_type="diary",
+        title=diary.title,
+        content=diary.content,
+        tags="일기,개인기록",
+        importance_score=3
+    )
+    
+    db.add(context_data)
+    db.commit()
+    
     return DiaryResponse(
         id=diary_entry.id,
         title=diary_entry.title,
@@ -368,11 +414,28 @@ async def chat_with_ai(
     db.add(user_chat_log)
     
     try:
-        # LLM 서비스에 요청
+        # 사용자의 컨텍스트 데이터(일기 등) 가져오기
+        context_data = db.query(UserContextData).filter(
+            UserContextData.user_id == user_id
+        ).order_by(UserContextData.importance_score.desc(), UserContextData.created_at.desc()).limit(5).all()
+        
+        # 컨텍스트 데이터를 문자열로 변환
+        context_text = ""
+        if context_data:
+            context_text = "\n".join([
+                f"[{data.data_type}] {data.title or ''}: {data.content[:200]}..."
+                for data in context_data
+            ])
+        
+        # LLM 서비스에 요청 (컨텍스트 포함)
         async with httpx.AsyncClient() as client:
             llm_response = await client.post(
                 f"{settings.LLM_SERVICE_URL}/api/chat",
-                json={"message": chat_message.message, "user_id": user_id},
+                json={
+                    "message": chat_message.message, 
+                    "user_id": user_id,
+                    "context": context_text
+                },
                 timeout=30.0
             )
             

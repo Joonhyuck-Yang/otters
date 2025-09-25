@@ -14,6 +14,9 @@ import os
 import asyncio
 import schedule
 import threading
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.date import DateTrigger
 
@@ -30,6 +33,13 @@ class Settings:
     LLM_SERVICE_URL = os.getenv("LLM_SERVICE_URL", "http://localhost:8001")
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
     DEBUG = os.getenv("DEBUG", "true").lower() == "true"
+    
+    # 이메일 설정
+    SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
+    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+    FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@oters.com")
 
 settings = Settings()
 
@@ -206,21 +216,94 @@ async def root():
 async def health_check():
     return {"status": "healthy", "service": "alarm"}
 
-# 알람 관련 함수들
-async def send_notification(user_id: int, schedule_id: int, title: str, description: str):
-    """실제 알람 전송 함수"""
+# 이메일 알림 관련 함수들
+async def send_email_notification(user_email: str, user_name: str, title: str, description: str):
+    """이메일 알림 전송 함수"""
     try:
-        # 여기에 실제 푸시 알림 전송 로직 구현
-        # Firebase Cloud Messaging, OneSignal 등 사용
-        print(f"알람 전송: 사용자 {user_id}, 일정 {schedule_id}, 제목: {title}")
+        # 이메일 내용 생성
+        subject = f"🔔 오터스 알림: {title}"
         
-        # DB에서 일정 완료 처리
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                    🔔 오터스 알림
+                </h2>
+                
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h3 style="color: #2c3e50; margin-top: 0;">{title}</h3>
+                    {f'<p style="color: #666;">{description}</p>' if description else ''}
+                </div>
+                
+                <div style="background: #e8f4fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <p style="margin: 0; color: #2c3e50;">
+                        안녕하세요, {user_name}님!<br>
+                        설정하신 일정 시간이 되었습니다.
+                    </p>
+                </div>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="http://localhost:3000" 
+                       style="background: #3498db; color: white; padding: 12px 24px; 
+                              text-decoration: none; border-radius: 6px; display: inline-block;">
+                        오터스로 이동
+                    </a>
+                </div>
+                
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #999; font-size: 12px; text-align: center;">
+                    이 이메일은 오터스 AI 비서 서비스에서 자동으로 발송되었습니다.<br>
+                    문의사항이 있으시면 고객지원팀에 연락해주세요.
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # 이메일 전송
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = settings.FROM_EMAIL
+        msg['To'] = user_email
+        
+        html_part = MIMEText(html_content, 'html', 'utf-8')
+        msg.attach(html_part)
+        
+        # SMTP 서버 연결 및 전송
+        server = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT)
+        server.starttls()
+        server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+        
+        print(f"이메일 알림 전송 완료: {user_email} - {title}")
+        
+    except Exception as e:
+        print(f"이메일 알림 전송 실패: {e}")
+
+async def send_notification(user_id: int, schedule_id: int, title: str, description: str):
+    """실제 알람 전송 함수 (이메일)"""
+    try:
+        # 사용자 정보 가져오기
         db = SessionLocal()
         try:
+            user = db.query(User).filter(User.id == user_id).first()
             schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
-            if schedule:
+            
+            if user and schedule:
+                # 이메일 알림 전송
+                await send_email_notification(
+                    user.email, 
+                    user.name, 
+                    title, 
+                    description
+                )
+                
+                # 일정 완료 처리
                 schedule.is_completed = True
                 db.commit()
+                
         finally:
             db.close()
             
