@@ -22,7 +22,7 @@ import uvicorn
 
 # 설정
 class Settings:
-    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:password@localhost:5432/oters")
+    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./oters.db")
     SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
     ALGORITHM = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES = 30
