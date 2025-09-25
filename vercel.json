@@ -9,6 +9,7 @@
       }
     }
   ],
+  "outputDirectory": "frontend/build",
   "routes": [
     {
       "src": "/static/(.*)",
