@@ -180,7 +180,8 @@ const ChatPage = () => {
   const createNewSession = async () => {
     try {
       const token = localStorage.getItem('access_token');
-      const response = await axios.post('/api/chat/new-session', {}, {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+      const response = await axios.post(`${apiUrl}/api/chat/new-session`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSessionId(response.data.session_id);
@@ -199,7 +200,8 @@ const ChatPage = () => {
 
     try {
       const token = localStorage.getItem('access_token');
-      const response = await axios.post('/api/chat', {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+      const response = await axios.post(`${apiUrl}/api/chat`, {
         message: message.trim(),
         session_id: sessionId
       }, {

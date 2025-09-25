@@ -81,7 +81,8 @@ const LoginPage = () => {
       // 임시로 테스트용 토큰 사용 (실제로는 Google OAuth2 플로우 필요)
       const mockGoogleToken = "test_google_token";
       
-      const response = await axios.post('/api/auth/google', {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+      const response = await axios.post(`${apiUrl}/api/auth/google`, {
         access_token: mockGoogleToken
       });
       
