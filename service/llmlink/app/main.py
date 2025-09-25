@@ -51,10 +51,9 @@ class DiaryEntry(Base):
     __tablename__ = "diary_entries"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    title = Column(String(200), nullable=False)
-    content = Column(Text, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    account_id = Column(String(255), nullable=False, index=True)  # 구글 아이디
+    diary = Column(Text, nullable=False)  # 사용자가 입력한 일기/일정
+    date = Column(DateTime(timezone=True), nullable=False)  # 입력한 날짜/시간
     
     user = relationship("User", back_populates="diary_entries")
 
@@ -95,14 +94,14 @@ class TokenResponse(BaseModel):
     token_type: str
 
 class DiaryCreate(BaseModel):
-    title: str
-    content: str
+    diary: str
+    date: datetime
 
 class DiaryResponse(BaseModel):
     id: int
-    title: str
-    content: str
-    created_at: datetime
+    account_id: str
+    diary: str
+    date: datetime
 
 class ChatMessage(BaseModel):
     message: str
@@ -327,10 +326,18 @@ async def create_diary(
             detail="Invalid token"
         )
     
+    # 사용자 정보 가져오기
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
     diary_entry = DiaryEntry(
-        user_id=user_id,
-        title=diary.title,
-        content=diary.content
+        account_id=user.google_uid,  # 구글 아이디
+        diary=diary.diary,           # 사용자가 입력한 일기/일정
+        date=diary.date              # 입력한 날짜/시간
     )
     
     db.add(diary_entry)
@@ -341,8 +348,8 @@ async def create_diary(
     context_data = UserContextData(
         user_id=user_id,
         data_type="diary",
-        title=diary.title,
-        content=diary.content,
+        title="일기",
+        content=diary.diary,
         tags="일기,개인기록",
         importance_score=3
     )
@@ -352,9 +359,9 @@ async def create_diary(
     
     return DiaryResponse(
         id=diary_entry.id,
-        title=diary_entry.title,
-        content=diary_entry.content,
-        created_at=diary_entry.created_at
+        account_id=diary_entry.account_id,
+        diary=diary_entry.diary,
+        date=diary_entry.date
     )
 
 @app.get("/api/diary", response_model=List[DiaryResponse])

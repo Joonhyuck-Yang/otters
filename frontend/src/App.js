@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import ChatPage from './components/ChatPage';
 import LoginPage from './components/LoginPage';
+import DiaryPage from './components/DiaryPage';
 
 function App() {
   return (
@@ -11,6 +12,7 @@ function App() {
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/chat" element={<ChatPage />} />
+          <Route path="/diary" element={<DiaryPage />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </div>

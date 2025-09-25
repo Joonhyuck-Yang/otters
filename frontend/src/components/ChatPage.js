@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
-import { Mic, MicOff, Send, Plus } from 'lucide-react';
+import { Mic, MicOff, Send, Plus, BookOpen } from 'lucide-react';
 import axios from 'axios';
 
 const ChatContainer = styled.div`
@@ -15,6 +15,7 @@ const ChatContainer = styled.div`
 const Header = styled.div`
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 20px;
   border-bottom: 1px solid #333;
   background: #2a2a2a;
@@ -24,6 +25,23 @@ const Logo = styled.div`
   font-size: 24px;
   font-weight: bold;
   color: #ffffff;
+`;
+
+const DiaryButton = styled.button`
+  display: flex;
+  align-items: center;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 15px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+
+  &:hover {
+    background: #0056b3;
+  }
 `;
 
 const ChatArea = styled.div`
@@ -232,15 +250,18 @@ const ChatPage = () => {
     }
   };
 
-  const toggleRecording = () => {
-    setIsRecording(!isRecording);
-    // 음성 녹음 기능 구현 예정
+  const handleDiaryClick = () => {
+    window.location.href = '/diary';
   };
 
   return (
     <ChatContainer>
       <Header>
         <Logo>오터스 비서</Logo>
+        <DiaryButton onClick={handleDiaryClick}>
+          <BookOpen size={16} style={{ marginRight: '8px' }} />
+          일기장
+        </DiaryButton>
       </Header>
 
       {messages.length === 0 ? (
