@@ -83,7 +83,7 @@ ollama pull llama2
 
 ### 환경 변수
 ```bash
-DATABASE_URL=postgresql://user:password@localhost:5432/oters
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/oters
 SECRET_KEY=your-secret-key-here
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
